@@ -31,6 +31,7 @@ module Grape
       def initial_setup(base_instance_parent)
         @instances = []
         @setup = []
+        @compiled = false
         @base_parent = base_instance_parent
         @base_instance = mount_instance
       end
@@ -77,7 +78,7 @@ module Grape
         end
       end
 
-      # Alleviates problems with autoloading by tring to search for the constant
+      # Alleviates problems with autoloading by trying to search for the constant
       def const_missing(*args)
         if base_instance.const_defined?(*args)
           base_instance.const_get(*args)
@@ -87,7 +88,7 @@ module Grape
       end
 
       # The remountable class can have a configuration hash to provide some dynamic class-level variables.
-      # For instance, a descripcion could be done using: `desc configuration[:description]` if it may vary
+      # For instance, a description could be done using: `desc configuration[:description]` if it may vary
       # depending on where the endpoint is mounted. Use with care, if you find yourself using configuration
       # too much, you may actually want to provide a new API rather than remount it.
       def mount_instance(opts = {})
@@ -126,6 +127,8 @@ module Grape
       def compile!
         require 'grape/eager_load'
         instance_for_rack.compile! # See API::Instance.compile!
+        @compiled = true
+        @setup = nil
       end
 
       private
@@ -141,7 +144,9 @@ module Grape
       # Adds a new stage to the set up require to get a Grape::API up and running
       def add_setup(method, *args, &block)
         setup_step = { method: method, args: args, block: block }
-        @setup << setup_step
+
+        @setup << setup_step unless @compiled
+
         last_response = nil
         @instances.each do |instance|
           last_response = replay_step_on(instance, setup_step)
